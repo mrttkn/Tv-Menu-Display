@@ -1,0 +1,153 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ürünler</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between; /* Sütunları yan yana yerleştirir */
+            margin: 20px;
+        }
+
+        .column {
+            width: 48%; /* Sütun genişliğini %48 olarak ayarladık */
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 15px;
+        }
+
+        .group-title {
+            font-size: 20px;
+            margin-bottom: 15px;
+            color: #4CAF50;
+        }
+
+        .product-item {
+            border-bottom: 1px solid #eee;
+            padding: 10px 0;
+        }
+
+            .product-item:last-child {
+                border-bottom: none;
+            }
+
+            .product-item h3 {
+                margin: 0;
+                font-size: 18px;
+                color: #555;
+            }
+
+            .product-item p {
+                margin: 5px 0 0;
+                font-size: 16px;
+                color: #888;
+            }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="left-column" class="column"></div>
+        <div id="right-column" class="column"></div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            displayCategoryProducts();
+        });
+
+        const displayCategoryProducts = async () => {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const groupIDs = urlParams.getAll('groupIDs').map(Number);
+                const groupNames = urlParams.getAll('groupNames');
+
+                if (groupIDs.length === 0 || groupNames.length === 0) {
+                    // Grup isimlerini göstermek için boş bırakın
+                    return;
+                }
+
+                // API'den ürünleri çek
+                const response = await fetch(`http://localhost:5023/api/Menu/products?${urlParams}`);
+                if (!response.ok) throw new Error('Ürünler alınamadı.');
+                const products = await response.json();
+
+                const leftColumn = document.getElementById('left-column');
+                const rightColumn = document.getElementById('right-column');
+
+                // Sadece bir grup varsa, sağ taraftaki kolonun ortada olduğundan emin ol
+                let groupsRendered = 0;
+
+                groupIDs.forEach((groupID, index) => {
+                    const groupColumn = document.createElement('div');
+                    const groupTitle = document.createElement('h2');
+                    groupTitle.classList.add('group-title');
+                    groupTitle.textContent = groupNames[index];
+
+                    groupColumn.appendChild(groupTitle);
+
+                    const groupProducts = products.filter(product => product.MenuGroupID === groupID);
+
+                    if (groupProducts.length === 0) {
+                        const noProducts = document.createElement('p');
+                        noProducts.textContent = 'Bu gruba ait ürün bulunamadı.';
+                        groupColumn.appendChild(noProducts);
+                    } else {
+                        groupProducts.forEach(product => {
+                            const productItem = document.createElement('div');
+                            productItem.classList.add('product-item');
+
+                            const productName = document.createElement('h3');
+                            productName.textContent = product.MenuItemText;
+
+                            const productPrice = document.createElement('p');
+                            productPrice.textContent = `${product.DefaultUnitPrice.toFixed(2)} TL`;
+
+                            productItem.appendChild(productName);
+                            productItem.appendChild(productPrice);
+                            groupColumn.appendChild(productItem);
+                        });
+                    }
+
+                    if (index === 0) {
+                        leftColumn.appendChild(groupColumn);
+                    } else {
+                        rightColumn.appendChild(groupColumn);
+                    }
+
+                    groupsRendered += 1;
+                });
+
+                // Eğer sadece bir grup seçildiyse sağdaki kolon ortada olacak şekilde ayarla
+                if (groupsRendered === 1) {
+                    leftColumn.style.width = '100%'; // Tekli grupta sola genişlik veriyoruz
+                    rightColumn.style.display = 'none'; // Sağ kolonu gizliyoruz
+                } else {
+                    leftColumn.style.width = '48%'; // İki grup seçildiğinde sol %48 olsun
+                    rightColumn.style.display = 'block'; // Sağ kolonu gösteriyoruz
+                }
+
+            } catch (error) {
+                console.error('Bir hata oluştu:', error);
+            }
+        };
+    </script>
+
+</body>
+</html>
+

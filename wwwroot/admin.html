@@ -1,0 +1,260 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yönetici Paneli</title>
+    <style>
+        body {
+            font-family: Tahoma, sans-serif;
+            background-color: #2E2E2E;
+            color: #F5F5F5;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        #group-list {
+            max-width: 800px;
+            margin: 20px auto;
+        }
+
+        .accordion {
+            background-color: #3C3C3C;
+            border-radius: 5px;
+            border: 1px solid #555;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .accordion-header {
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+            .accordion-header:hover {
+                background-color: #444;
+            }
+
+        .accordion-content {
+            display: none;
+            padding: 10px;
+            background-color: #4C4C4C;
+        }
+
+            .accordion-content ul {
+                list-style: none;
+                padding: 0;
+                margin: 0;
+            }
+
+                .accordion-content ul li {
+                    margin-bottom: 5px;
+                    display: flex;
+                    align-items: center;
+                }
+
+                    .accordion-content ul li input[type="checkbox"] {
+                        margin-right: 10px;
+                    }
+
+        .active-product {
+            color: #2ECC71; /* Aktif ürünler için yeşil renk */
+        }
+
+        button {
+            background-color: #E74C3C;
+            color: #F5F5F5;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+            button:hover {
+                background-color: #C0392B;
+                transform: scale(1.05);
+            }
+
+            button:active {
+                transform: scale(0.95);
+            }
+
+        .group-buttons {
+            margin-top: 10px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <h1>Yönetici Paneli</h1>
+    <div id="group-list"></div>
+    <script>
+        const fetchMenuGroups = async () => {
+            try {
+                const response = await fetch('http://localhost:5023/api/Menu/grouped');
+                if (!response.ok) throw new Error('API hatası: ' + response.statusText);
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('API hatası:', error);
+                return [];
+            }
+        };
+
+
+
+        const fetchGroupProducts = async (groupID) => {
+            try {
+                console.log('buradasın')
+                const response = await fetch(`http://localhost:5023/api/Menu/grouped/${groupID}`);
+                if (!response.ok) throw new Error('API hatası: ' + response.statusText);
+                const data = await response.json();
+
+                // Check if products have CustomField10 = 1 (active)
+                data.forEach(product => {
+                    product.isActive = product.CustomField10 === '1'; // Burada aktiflik durumunu kontrol ediyoruz
+                });
+                console.log(data)
+                return data;
+            } catch (error) {
+                console.error(`Grup ${groupID} ürünleri yüklenirken hata oluştu:`, error);
+                return [];
+            }
+        };
+
+        const updateMenuItemsStatus = async (menuItemIDs, isActive) => {
+            try {
+                const url = isActive
+                    ? 'http://localhost:5023/api/Menu/activate'
+                    : 'http://localhost:5023/api/Menu/deactivate';
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(menuItemIDs),
+                });
+
+                if (!response.ok) throw new Error('API hatası: ' + response.statusText);
+
+                const result = await response.text();
+                alert(result);
+            } catch (error) {
+                console.error('Durum güncelleme hatası:', error);
+                alert('Ürün durumu güncellenirken hata oluştu.');
+            }
+        };
+
+        const displayMenuGroups = async () => {
+            const menuGroups = await fetchMenuGroups();
+            const groupList = document.getElementById('group-list');
+
+            if (menuGroups.length === 0) {
+                groupList.innerHTML = '<p>Kategori bulunamadı.</p>';
+                return;
+            }
+
+            menuGroups.forEach(group => {
+                const accordion = document.createElement('div');
+                accordion.classList.add('accordion');
+
+                const header = document.createElement('div');
+                header.classList.add('accordion-header');
+                header.innerHTML = `<span>${group.groupName}</span>`;
+
+                const content = document.createElement('div');
+                content.classList.add('accordion-content');
+                content.id = `group-content-${group.groupID}`;
+
+                header.addEventListener('click', async () => {
+                    if (content.style.display === 'block') {
+                        content.style.display = 'none';
+                    } else {
+                        content.style.display = 'block';
+
+                        if (content.childElementCount === 0) {
+                            const products = await fetchGroupProducts(group.groupID);
+                            if (products.length > 0) {
+                                const productList = document.createElement('ul');
+                                products.forEach(product => {
+                                    const productItem = document.createElement('li');
+                                    if (product.isActive) {
+                                        productItem.classList.add('active'); // Eğer ürün aktifse 'active' sınıfını ekle
+                                    }
+                                    productItem.innerHTML = `
+                                    <input type="checkbox" value="${product.MenuItemID}" />
+                                    ${product.MenuItemText} - ${product.DefaultUnitPrice} ₺`;
+                                    if (product.isActive) {
+                                        productItem.style.color = '#2ECC71'; // Aktif ürünler için farklı renk
+                                    }
+                                    productList.appendChild(productItem);
+                                });
+                                content.appendChild(productList);
+
+                                const buttonContainer = document.createElement('div');
+                                buttonContainer.classList.add('group-buttons');
+                                buttonContainer.innerHTML = `
+                                <button onclick="handleGroupAction(${group.groupID}, true)">Göster</button>
+                                <button onclick="handleGroupAction(${group.groupID}, false)">Gizle</button>
+                            `;
+                                content.appendChild(buttonContainer);
+                            } else {
+                                content.innerHTML = '<p>Bu gruba ait ürün bulunamadı.</p>';
+                            }
+                        }
+                    }
+                });
+
+                accordion.appendChild(header);
+                accordion.appendChild(content);
+                groupList.appendChild(accordion);
+            });
+        };
+
+        const handleGroupAction = async (groupID, isActive) => {
+            const content = document.getElementById(`group-content-${groupID}`);
+            const checkboxes = content.querySelectorAll('input[type="checkbox"]:checked');
+            const menuItemIDs = Array.from(checkboxes).map(checkbox => parseInt(checkbox.value));
+
+            if (menuItemIDs.length === 0) {
+                alert('Lütfen en az bir ürün seçiniz.');
+                return;
+            }
+
+            try {
+                const response = await fetch(isActive ? 'http://localhost:5023/api/Menu/activate' : 'http://localhost:5023/api/Menu/deactivate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(menuItemIDs),
+                });
+
+                if (!response.ok) throw new Error('API hatası: ' + response.statusText);
+
+                const result = await response.text();
+                alert(result);
+
+                // Update product list to highlight active products
+                menuItemIDs.forEach(itemID => {
+                    const productItem = content.querySelector(`li input[value="${itemID}"]`).closest('li');
+                    productItem.classList.toggle('active-product', isActive); // highlight the active product
+                });
+
+            } catch (error) {
+                console.error('Durum güncelleme hatası:', error);
+                alert('Ürün durumu güncellenirken hata oluştu.');
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', displayMenuGroups);
+    </script>
+</body>
+</html>

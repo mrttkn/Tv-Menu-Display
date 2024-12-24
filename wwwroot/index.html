@@ -1,0 +1,152 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kategoriler</title>
+    <style>
+        body {
+            font-family: Tahoma, sans-serif;
+            background-color: #2E2E2E;
+            color: #F5F5F5;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        #category-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 20px auto;
+            max-width: 400px;
+        }
+
+        .category-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background-color: #3C3C3C;
+            border-radius: 5px;
+            border: 1px solid #555;
+        }
+
+            .category-item label {
+                flex: 1;
+            }
+
+        button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #444;
+            color: #F5F5F5;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+            button:hover {
+                background-color: #5C5C5C;
+            }
+
+            button:disabled {
+                background-color: #888;
+                cursor: not-allowed;
+            }
+    </style>
+</head>
+<body>
+    <h1>Kategoriler</h1>
+    <div id="category-list"></div>
+    <button id="view-selected" disabled>Seçili Kategorileri Görüntüle</button>
+
+    <script>
+        const fetchMenuGroups = async () => {
+            try {
+                const response = await fetch('http://localhost:5023/api/Menu/grouped');
+                if (!response.ok) {
+                    throw new Error('API hatası: ' + response.statusText);
+                }
+                const data = await response.json();
+
+                if (!data || !Array.isArray(data)) {
+                    throw new Error('Geçersiz veri formatı');
+                }
+
+                return data;
+            } catch (error) {
+                console.error('API hatası:', error);
+                return [];
+            }
+        };
+
+        const displayMenuGroups = async () => {
+            const menuGroups = await fetchMenuGroups();
+            if (menuGroups.length === 0) {
+                console.warn('Menü grupları bulunamadı.');
+                return;
+            }
+
+            const categoryList = document.getElementById('category-list');
+            const viewSelectedButton = document.getElementById('view-selected');
+            let selectedCategories = [];
+
+            menuGroups.forEach(group => {
+                const categoryItem = document.createElement('div');
+                categoryItem.classList.add('category-item');
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `group-${group.groupID}`;
+                checkbox.value = JSON.stringify({
+                    groupID: group.groupID,
+                    groupName: group.groupName,
+                });
+
+                const label = document.createElement('label');
+                label.htmlFor = `group-${group.groupID}`;
+                label.textContent = group.groupName;
+
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) {
+                        if (selectedCategories.length < 2) {
+                            selectedCategories.push(JSON.parse(checkbox.value));
+                        } else {
+                            checkbox.checked = false;
+                            alert('En fazla iki kategori seçebilirsiniz!');
+                        }
+                    } else {
+                        selectedCategories = selectedCategories.filter(
+                            cat => cat.groupID !== JSON.parse(checkbox.value).groupID
+                        );
+                    }
+
+                    viewSelectedButton.disabled = selectedCategories.length === 0;
+                });
+
+                categoryItem.appendChild(checkbox);
+                categoryItem.appendChild(label);
+                categoryList.appendChild(categoryItem);
+            });
+
+            viewSelectedButton.addEventListener('click', () => {
+                if (selectedCategories.length > 0) {
+                    const queryParams = selectedCategories
+                        .map(cat => `groupIDs=${cat.groupID}&groupNames=${encodeURIComponent(cat.groupName)}`)
+                        .join('&');
+                    window.location.href = `products.html?${queryParams}`;
+                }
+            });
+        };
+
+        document.addEventListener('DOMContentLoaded', displayMenuGroups);
+    </script>
+</body>
+</html>
